@@ -1,12 +1,619 @@
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HAI Clinical AI</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HAI v10.27 — Advanced CRO with AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
-body{font-family:Arial,sans-serif;background:#fdf9fb;padding:40px}
-.card{max-width:1000px;margin:auto;background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
-h1{color:#c81e34}
-</style></head>
-<body><div class="card">
-<h1>HAI Clinical AI</h1>
-<p>Single-file deployment. No Java dependencies.</p>
-</div></body></html>
+:root{ --red:#E11D2E; --darkred:#991B1B; --pink:#F472B6; --ink:#0E1421; --bg:#F6F7FB; --stroke:#EAE3E3;
+  --ok:#22c55e; --mid:#f59e0b; --warn:#f97316; --bad:#ef4444; }
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial;color:var(--ink);background:var(--bg)}
+.topbar{position:sticky;top:0;z-index:999;background:#fff;border-bottom:3px solid var(--red);display:flex;align-items:center;justify-content:space-between;padding:10px 16px}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--pink));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px}
+.brand h1{margin:0;font-size:16px} .brand p{margin:0;color:#6B7280;font-size:12px}
+.tabs{display:flex;gap:8px}
+.tabbtn{border:2px solid var(--red);color:var(--red);background:#fff;border-radius:12px;padding:8px 14px;font-weight:900;cursor:pointer}
+.tabbtn.active{background:var(--red);color:#fff}
+.view{max-width:1100px;margin:14px auto;padding:0 12px}
+.section{background:#fff;border:1px solid var(--stroke);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 12px 26px rgba(0,0,0,.05);position:relative;overflow:hidden}
+.hmark{position:absolute;right:10px;bottom:-8px;font-size:100px;font-weight:900;color:rgba(225,29,46,.05);pointer-events:none}
+.h2{margin:0 0 8px 0}
+.small{font-size:12px;color:#6B7280}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:900px){ .row{grid-template-columns:1fr} }
+.input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid var(--stroke);background:#fff}
+.btn{background:var(--red);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--red);border:2px solid var(--red)}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{padding:6px 10px;border-radius:999px;border:1px solid var(--stroke);font-weight:700;background:#fff;cursor:pointer}
+.pill.active{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+.preview{position:relative;width:100%;height:520px;border-radius:16px;background:#0b1220;display:flex;align-items:center;justify-content:center;color:#94a3b8;overflow:hidden;border:1px solid var(--stroke)}
+.preview video,.preview img{width:100%;height:100%;object-fit:cover}
+.overlay{position:absolute;inset:0;pointer-events:none;z-index:1}
+.circle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(60vmin,70%);height:min(60vmin,70%);border-radius:50%;
+        box-shadow:0 0 0 2px #fff inset, 0 0 0 160vmax rgba(0,0,0,.35);}
+.midline-x{position:absolute;left:0;right:0;top:50%;height:2px;background:rgba(255,255,255,0.55)}
+.midline-y{position:absolute;top:0;bottom:0;left:50%;width:2px;background:rgba(255,255,255,0.55)}
+.scoregrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(max-width:900px){ .scoregrid{grid-template-columns:1fr} }
+.score{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--stroke);border-radius:12px;background:#fff;padding:10px 12px;font-weight:700}
+.score .right{display:flex;gap:8px;align-items:center}
+.score .tag{padding:4px 8px;border-radius:8px;font-weight:800;color:#fff}
+.score .sev{border:1px solid var(--stroke);border-radius:8px;padding:3px 6px;font-size:12px}
+.ok{background:var(--ok)} .mid{background:var(--mid)} .warn{background:var(--warn)} .bad{background:var(--bad)}
+.table{width:100%;border-collapse:collapse} .table th,.table td{padding:8px;border-bottom:1px solid var(--stroke);text-align:left;font-size:13px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">H</div>
+      <div>
+        <h1>Advanced CRO with AI — Laboratoire Hibalogique Inc. (H™)</h1>
+        <p>HAI v10.27 · Dual-window · CAC Frontal-only · p-values · tightened severity</p>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tabbtn active" id="tabParticipant">Participant</button>
+      <button class="tabbtn" id="tabAdmin">Admin</button>
+    </div>
+  </div>
+
+  <!-- PARTICIPANT VIEW -->
+  <div id="viewParticipant" class="view">
+    <!-- Consent -->
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Informed Consent</h2>
+      <div class="small">Auto-filled from the active Study; export as PDF or Excel.</div>
+      <div class="row">
+        <div>
+          <label class="small">Active Study</label>
+          <select id="p_study" class="input"></select>
+          <pre id="icfBlock" class="small" style="white-space:pre-wrap;background:#fafafa;border:1px dashed #eee;padding:8px;border-radius:10px;margin-top:8px"></pre>
+        </div>
+        <div>
+          <div class="row">
+            <input id="c_age" class="input" placeholder="Age">
+            <input id="c_gender" class="input" placeholder="Gender/Sex">
+            <input id="c_fitz" class="input" placeholder="Fitzpatrick (I–VI)">
+            <input id="c_skin" class="input" placeholder="Skin type">
+            <input id="c_preg" class="input" placeholder="Pregnant/Lactating (Y/N)">
+            <input id="c_allergy" class="input" placeholder="Allergies">
+            <input id="c_meds" class="input" placeholder="Meds/Topicals">
+            <input id="c_version" class="input" placeholder="Consent version #">
+          </div>
+          <div class="row" style="margin-top:8px">
+            <input id="sig_name" class="input" placeholder="Typed name">
+            <input id="sig_date" class="input" type="date">
+          </div>
+          <label class="small"><input id="attest" type="checkbox"> I agree to the terms above.</label>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn" id="consentSave">Save Consent</button>
+            <button class="btn ghost" id="consentPDF">Download PDF</button>
+            <button class="btn ghost" id="consentExcel">Download Excel (demographics)</button>
+            <span id="consentMsg" class="small"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Identify -->
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Identify Participant</h2>
+      <div class="row">
+        <input id="firstName" class="input" placeholder="First name" required>
+        <input id="lastName" class="input" placeholder="Last name" required>
+        <input id="email" class="input" placeholder="you@example.com" required>
+        <div class="pills"><span class="pill" id="pcodeBox">Code: —</span><span class="pill" id="pointsBox">Points: 0</span></div>
+      </div>
+      <div style="margin-top:8px"><button class="btn" id="startBtn">Start / Continue</button></div>
+    </section>
+
+    <!-- Timepoints -->
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Timepoint</h2>
+      <div id="tpList" class="pills"></div>
+      <div class="small" style="margin-top:6px">Current TP: <b id="tpBanner">—</b> • CAC: <b>Frontal angle required</b></div>
+    </section>
+
+    <!-- Capture -->
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Capture — Frontal Only</h2>
+      <div class="row">
+        <div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="resSel" class="input" style="width:auto">
+              <option value="2160p" selected>4K 2160p</option><option value="1440p">1440p</option><option value="1080p">1080p</option>
+            </select>
+            <button class="btn" id="camStart">Start</button>
+            <button class="btn" id="camSnap">Capture</button>
+            <button class="btn ghost" id="savePhoto" style="display:none">Save to TP</button>
+            <button class="btn ghost" id="camStop">Stop</button>
+            <input type="file" accept="image/*" id="fileInput">
+            <button class="btn ghost" id="dlCurrent">Download Image</button>
+            <span class="small" id="qualityTag">—</span>
+          </div>
+        </div>
+        <div>
+          <div class="preview" id="previewWrap">
+            <div class="overlay"><div class="circle"></div><div class="midline-x"></div><div class="midline-y"></div></div>
+            <div style="position:absolute;color:#94a3b8">No image</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Results (Percent + Severity)</h2>
+      <div class="row">
+        <div>
+          <h3 class="h2">Face</h3>
+          <div id="faceScores" class="scoregrid"></div>
+        </div>
+        <div>
+          <h3 class="h2">Hair/Scalp</h3>
+          <div id="hairScores" class="scoregrid"></div>
+        </div>
+      </div>
+      <div class="small" id="angleStatus" style="margin-top:6px"></div>
+      <div style="margin-top:8px">
+        <button class="btn" id="completeStudy">Finish Study (+100 points)</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ADMIN VIEW -->
+  <div id="viewAdmin" class="view hidden">
+    <section class="section">
+      <div class="hmark">H</div>
+      <h2 class="h2">Admin — PIN Unlock</h2>
+      <div class="row">
+        <input id="pin" class="input" placeholder="PIN" type="password">
+        <button class="btn" id="unlockBtn">Unlock</button>
+      </div>
+      <div id="adminWrap" class="hidden">
+        <div class="section">
+          <h3 class="h2">Study Setup</h3>
+          <div class="row">
+            <input id="s_title" class="input" placeholder="Study Title / Code">
+            <input id="s_client" class="input" placeholder="Client Name (Sponsor)">
+            <input id="s_internal" class="input" placeholder="Internal Code / Study #">
+            <input id="s_product_type" class="input" placeholder="Product Type (e.g., serum, shampoo)">
+            <input id="s_product_name" class="input" placeholder="Product Name">
+            <input id="s_batch" class="input" placeholder="Batch Number">
+            <input id="s_area" class="input" placeholder="Application Area (e.g., face, scalp)">
+            <input id="s_comp" class="input" placeholder="Compensation (e.g., $50 + product)">
+            <input id="s_timepoints" class="input" placeholder="Timepoints e.g., D0, D7, D14, D28">
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="saveStudyBtn">Save Study</button>
+            <button class="btn ghost" id="newStudyBtn">New Study</button>
+            <select id="studySelect" class="input" style="max-width:260px"></select>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3 class="h2">Participants</h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="pSearch" class="input" placeholder="Filter by code/email" style="max-width:260px">
+            <button class="btn ghost" id="pSearchBtn">Filter</button>
+            <button class="btn ghost" id="pClearBtn">Clear</button>
+          </div>
+          <table class="table" id="participantsTable">
+            <thead><tr><th></th><th>Code</th><th>Name</th><th>Email</th><th>TPs</th><th>Angles</th><th>Points</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn" id="adminExportExcel">Export Excel (selected)</button>
+            <button class="btn ghost" id="adminExportPDF">Reports PDF (selected)</button>
+            <button class="btn ghost" id="adminExportZIP">TP Images ZIP (selected)</button>
+            <button class="btn ghost" id="leaderboard">Leaderboard PDF</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+/* ====== SIMPLE VIEW SWITCH (Chrome-proof) ====== */
+const viewParticipant=document.getElementById('viewParticipant');
+const viewAdmin=document.getElementById('viewAdmin');
+const tabParticipant=document.getElementById('tabParticipant');
+const tabAdmin=document.getElementById('tabAdmin');
+function showParticipant(){ viewParticipant.classList.remove('hidden'); viewAdmin.classList.add('hidden'); tabParticipant.classList.add('active'); tabAdmin.classList.remove('active'); }
+function showAdmin(){ viewAdmin.classList.remove('hidden'); viewParticipant.classList.add('hidden'); tabAdmin.classList.add('active'); tabParticipant.classList.remove('active'); }
+tabParticipant.onclick=showParticipant; tabAdmin.onclick=showAdmin;
+// Failsafes
+document.addEventListener('keydown',(e)=>{ if(e.ctrlKey&&e.shiftKey&&e.key.toUpperCase()==='A'){ showAdmin(); } });
+if(new URLSearchParams(location.search).get('admin')==='true'){ showAdmin(); }
+
+/* ====== Storage helpers ====== */
+const DB=window.localforage;
+async function dbGet(k){ try{return await DB.getItem(k)}catch(e){return JSON.parse(localStorage.getItem(k)||'null')} }
+async function dbSet(k,v){ try{return await DB.setItem(k,v)}catch(e){ localStorage.setItem(k,JSON.stringify(v)) } }
+const P='hai_v1027_'; const S_STUDIES=P+'studies', S_ACTIVE=P+'active', S_PART=P+'parts', S_SEQ=P+'seq', S_CONSENT=P+'consent';
+
+/* ====== Elements ====== */
+const el=id=>document.getElementById(id);
+function sanitize(s){ if(!s) return ''; return s.normalize('NFKC').replace(/[“”«»]/g,'"').replace(/[‘’]/g,"'"); }
+function letters(s){ return (s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z]/g,''); }
+function genCode(fn,ln,seq){ const f=letters(fn).toUpperCase().slice(0,2).padEnd(2,'X'); const l=letters(ln).toUpperCase().slice(0,2).padEnd(2,'X'); const num=('0000'+seq).slice(-4); return f+l+num; }
+function nextSeq(cur){ let n=(parseInt(cur||'129')||129)+1; if(n<130) n=130; return n; }
+
+/* ====== Admin unlock ====== */
+function unlockAdmin(){ const pin=(el('pin').value||'').trim(); if(pin==='0000'){ el('adminWrap').classList.remove('hidden'); } else alert('Incorrect PIN'); }
+el('unlockBtn').onclick=unlockAdmin;
+
+/* ====== Study management ====== */
+function icfTemplate(s){return `Laboratoire Hibalogique Inc. - H™ | GCP-Aligned
+Informed Consent (electronic signature)
+
+Title: ${s.title||'-'}
+Client: ${s.client||'--'}
+Product: ${s.product_name||'-'} (${s.product_type||'-'})
+Area: ${s.area||'-'}
+Timepoints: ${(s.timepoints&&s.timepoints.length?s.timepoints:['—']).join(', ')}
+
+Summary
+Purpose: To evaluate safety, tolerance, and/or efficacy of the product under intended use.
+Design & Procedures: Controlled application on the designated area, standardized face/haircare photography, and questionnaires at predefined timepoints.
+Risks & Discomforts: Possible transient redness, dryness, irritation, itch, comedones, or color changes; SAEs unlikely and reported.
+Confidentiality: PIPEDA/PHIPA, TCPS2, ISO 14155, ICH E6(R2). Publications are de-identified. HIPAA if applicable.
+Photographic Consent: You authorize capture and secure storage of clinical images for scientific/educational purposes (not advertising without separate permission).
+Compensation: ${s.comp||'-'}
+Voluntary Participation: You may withdraw at any time without penalty.
+Contact: info@labhibalogique.com`; }
+
+async function initStudiesUI(){
+  const studies=await dbGet(S_STUDIES)||[]; let active=await dbGet(S_ACTIVE);
+  const sel=el('studySelect'); if(sel){ sel.innerHTML=''; studies.forEach(st=>{ const o=document.createElement('option'); o.value=st.id; o.textContent=st.title||st.id; sel.appendChild(o); });
+    if(!active && studies[0]){ active=studies[0].id; await dbSet(S_ACTIVE, active); }
+    if(active) sel.value=active; sel.onchange=async()=>{ await dbSet(S_ACTIVE, sel.value); renderConsentText(); renderTPs(); };
+  }
+  const psel=el('p_study'); if(psel){ psel.innerHTML=''; studies.forEach(st=>{ const o=document.createElement('option'); o.value=st.id; o.textContent=st.title||st.id; psel.appendChild(o); });
+    if(active) psel.value=active; psel.onchange=async()=>{ await dbSet(S_ACTIVE, psel.value); renderConsentText(); renderTPs(); };
+  }
+  const st=studies.find(s=>s.id===active)||{};
+  ['s_title','s_client','s_internal','s_product_type','s_product_name','s_batch','s_area','s_comp'].forEach(id=>{ if(el(id)) el(id).value=st[id.replace('s_','')]||''; });
+  if(el('s_timepoints')) el('s_timepoints').value=(st.timepoints||[]).join(', ');
+  renderConsentText(); renderTPs(); renderParticipantsTable();
+}
+async function saveStudy(){
+  const rec = {
+    id:'st-'+Math.random().toString(36).slice(2,9),
+    title:sanitize(el('s_title').value), client:sanitize(el('s_client').value), internal:sanitize(el('s_internal').value),
+    product_type:sanitize(el('s_product_type').value), product_name:sanitize(el('s_product_name').value),
+    batch:sanitize(el('s_batch').value), area:sanitize(el('s_area').value), comp:sanitize(el('s_comp').value),
+    timepoints:sanitize(el('s_timepoints').value).split(',').map(x=>x.trim()).filter(Boolean)
+  };
+  let studies=await dbGet(S_STUDIES)||[]; studies.push(rec); await dbSet(S_STUDIES, studies); await dbSet(S_ACTIVE, rec.id);
+  alert('Study saved & selected.'); initStudiesUI();
+}
+function newStudy(){ ['s_title','s_client','s_internal','s_product_type','s_product_name','s_batch','s_area','s_comp','s_timepoints'].forEach(id=>{ if(el(id)) el(id).value=''; }); }
+function renderConsentText(){ (async()=>{ const studies=await dbGet(S_STUDIES)||[]; const active=await dbGet(S_ACTIVE); const s=studies.find(z=>z.id===active)||{}; if(el('icfBlock')){ el('icfBlock').textContent = icfTemplate(s); } if(el('sig_date')) el('sig_date').value=new Date().toISOString().slice(0,10); })(); }
+el('saveStudyBtn')?.addEventListener('click',saveStudy); el('newStudyBtn')?.addEventListener('click',newStudy);
+
+/* ====== Participant session ====== */
+let EMAIL=null, NAME=null, PCODE=null, currentTP=null, camStream=null, lastDataURL=null, points=0, capturedFrontal=false;
+function nextSeq(cur){ let n=(parseInt(cur||'129')||129)+1; if(n<130) n=130; return n; }
+async function startSession(){
+  const fn=sanitize(el('firstName').value), ln=sanitize(el('lastName').value), em=(el('email').value||'').toLowerCase().trim();
+  if(!fn||!ln||!em||!em.includes('@')){ alert('Enter first name, last name, valid email.'); return; }
+  const studies=await dbGet(S_STUDIES)||[]; const active=await dbGet(S_ACTIVE); const s=studies.find(x=>x.id===active)||{};
+  if(!(s.timepoints&&s.timepoints.length)){ alert('Define timepoints in Admin.'); showAdmin(); return; }
+  let parts=(await dbGet(S_PART))||[]; let p=parts.find(x=>x.email===em);
+  if(!p){ const seq=nextSeq(await dbGet(S_SEQ)); await dbSet(S_SEQ, seq); PCODE=genCode(fn,ln,seq);
+    p={id:'p-'+Math.random().toString(36).slice(2,9), email:em, name:fn+' '+ln, code:PCODE, points:0, timepoints:{}}; parts.push(p); await dbSet(S_PART, parts);
+  } else { PCODE=p.code; points=p.points||0; }
+  EMAIL=em; NAME=fn+' '+ln; el('pcodeBox').textContent='Code: '+PCODE; el('pointsBox').textContent='Points: '+(points||0);
+  renderTPs(true);
+}
+el('startBtn').onclick=startSession;
+async function renderTPs(auto=false){
+  const studies=await dbGet(S_STUDIES)||[]; const active=await dbGet(S_ACTIVE); const s=studies.find(x=>x.id===active)||{};
+  const list=el('tpList'); if(!list) return; list.innerHTML='';
+  (s.timepoints||[]).forEach(tp=>{ const b=document.createElement('span'); b.className='pill'; b.textContent=tp; b.onclick=()=>{ currentTP=tp; document.querySelectorAll('#tpList .pill').forEach(x=>x.classList.remove('active')); b.classList.add('active'); el('tpBanner').textContent=tp; }; list.appendChild(b); });
+  if((auto||!currentTP) && (s.timepoints||[])[0]){ const b=list.querySelector('.pill'); if(b){ b.click(); } }
+}
+
+/* ====== Consent save + export ====== */
+async function saveConsent(){
+  const rec={ name:el('sig_name').value, date:el('sig_date').value, age:el('c_age').value, gender:el('c_gender').value, fitz:el('c_fitz').value, skin:el('c_skin').value, preg:el('c_preg').value, allergy:el('c_allergy').value, meds:el('c_meds').value, version:el('c_version').value, ts:new Date().toISOString() };
+  if(!rec.name || !rec.date || !el('attest').checked){ alert('Fill name, date, and check agree.'); return; }
+  await dbSet(S_CONSENT, rec); el('consentMsg').textContent='Consent saved.';
+}
+el('consentSave').onclick=saveConsent;
+async function exportConsentPDF(){
+  const { jsPDF } = window.jspdf; const rec=await dbGet(S_CONSENT); if(!rec){ alert('Save consent first.'); return; }
+  const studies=await dbGet(S_STUDIES)||[]; const active=await dbGet(S_ACTIVE); const s=studies.find(z=>z.id===active)||{};
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const t=(x)=>String(x||'—');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Laboratoire Hibalogique Inc. - H™ | GCP-Aligned',40,40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.text('Informed Consent (electronic signature)',40,58);
+  let y=90; const line=(a,b)=>{ doc.setFont('helvetica','bold'); doc.text(t(a),40,y); doc.setFont('helvetica','normal'); doc.text(t(b),170,y); y+=16; };
+  line('Title:', s.title); line('Client:', s.client); line('Product:', `${s.product_name||'-'} (${s.product_type||'-'})`); line('Area:', s.area); line('Timepoints:', (s.timepoints||['—']).join(', ')); line('Compensation:', s.comp||'-');
+  y+=6; const bl=`Summary
+Purpose: Evaluate safety, tolerance and/or efficacy under intended use. Standardized photography at predefined timepoints.
+Risks: Possible transient redness, dryness, irritation, itch, comedones or color changes; SAEs unlikely and reported.
+Confidentiality: PIPEDA/PHIPA, TCPS2, ISO 14155, ICH E6(R2). HIPAA if applicable.
+Photography: Clinical images stored securely; separate permission required for advertising.
+Voluntary: You may withdraw at any time.
+Contact: info@labhibalogique.com`;
+  const lines=doc.splitTextToSize(bl,520); doc.text(lines,40,y); y+=lines.length*12+12;
+  line('Participant code:', el('pcodeBox').textContent.replace('Code: ','')||'—'); line('Email:', (window.EMAIL)||'—');
+  line('Age:', rec.age); line('Gender/Sex:', rec.gender); line('Fitzpatrick:', rec.fitz); line('Skin type:', rec.skin); line('Preg/Lact:', rec.preg);
+  line('Allergies:', rec.allergy); line('Meds/Topicals:', rec.meds); line('Consent version:', rec.version||'—');
+  line('Typed name:', rec.name); line('Date:', rec.date); line('Timestamp:', rec.ts);
+  doc.setFontSize(9); doc.text('Contact: info@labhibalogique.com — Montréal, QC, Canada',40,800);
+  doc.save('Informed_Consent.pdf');
+}
+async function exportConsentExcel(){
+  const rec=await dbGet(S_CONSENT); if(!rec){ alert('Save consent first.'); return; }
+  const wb=new ExcelJS.Workbook(); wb.creator='HAI'; wb.created=new Date();
+  const sh=wb.addWorksheet('Consent'); sh.addRow(['Field','Value']); Object.entries(rec).forEach(([k,v])=> sh.addRow([k,String(v)]));
+  const buf=await wb.xlsx.writeBuffer(); const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Consent_Demographics.xlsx'; a.click();
+}
+el('consentPDF').onclick=exportConsentPDF; el('consentExcel').onclick=exportConsentExcel;
+
+/* ====== Camera & capture ====== */
+const resMap={'2160p':[3840,2160],'1440p':[2560,1440],'1080p':[1920,1080]};
+async function camStart(){
+  try{
+    const [w,h]=resMap[el('resSel').value]||[3840,2160];
+    camStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:w},height:{ideal:h},frameRate:{ideal:60,max:60},facingMode:'user'},audio:false});
+    const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=camStream;
+    const wrap=el('previewWrap'); wrap.innerHTML=''; wrap.appendChild(v);
+    const o=document.createElement('div'); o.className='overlay'; o.innerHTML='<div class="circle"></div><div class="midline-x"></div><div class="midline-y"></div>'; wrap.appendChild(o);
+  }catch(e){ alert('Camera error: '+e.message); }
+}
+function camStop(){ if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  el('previewWrap').innerHTML='<div class="overlay"><div class="circle"></div><div class="midline-x"></div><div class="midline-y"></div></div><div style="position:absolute;color:#94a3b8">No image</div>';
+}
+function upsampleAndSharpen(img){
+  const scale=1.5;
+  const sw=img.videoWidth||img.naturalWidth, sh=img.videoHeight||img.naturalHeight;
+  const cw=Math.round(sw*scale), ch=Math.round(sh*scale);
+  const c=document.createElement('canvas'); c.width=cw; c.height=ch; const cx=c.getContext('2d');
+  cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high'; cx.drawImage(img,0,0,cw,ch);
+  const id=cx.getImageData(0,0,cw,ch); const d=id.data;
+  const tmp=cx.getImageData(0,0,cw,ch); const t=tmp.data;
+  for(let y=0;y<ch;y++){ for(let x=1;x<cw-1;x++){ const i=(y*cw+x)*4; for(let k=0;k<3;k++){ t[i+k]=(d[i-4+k]+d[i+k]+d[i+4+k])/3; } t[i+3]=255; } }
+  for(let y=1;y<ch-1;y++){ for(let x=0;x<cw;x++){ const i=(y*cw+x)*4; for(let k=0;k<3;k++){ t[i+k]=(t[i-cw*4+k]+t[i+k]+t[i+cw*4+k])/3; } } }
+  const amount=0.6; for(let i=0;i<d.length;i+=4){ for(let k=0;k<3;k++){ const sharp=d[i+k]+amount*(d[i+k]-t[i+k]); d[i+k]=Math.max(0,Math.min(255,sharp)); } }
+  cx.putImageData(id,0,0); return c.toDataURL('image/jpeg',0.98);
+}
+function camSnap(){
+  const v=el('previewWrap').querySelector('video'); if(!v){ alert('Start the camera or upload an image.'); return; }
+  const enhanced=upsampleAndSharpen(v); displayCaptured(enhanced);
+}
+function fileChosen(e){ const f=e.target.files[0]; if(!f) return; const url=URL.createObjectURL(f); displayCaptured(url); }
+function downloadCurrent(){ if(!lastDataURL){ alert('No image yet.'); return; } const a=document.createElement('a'); a.href=lastDataURL; a.download=(currentTP||'image')+'_front.jpg'; a.click(); }
+el('camStart').onclick=camStart; el('camStop').onclick=camStop; el('camSnap').onclick=camSnap; el('fileInput').onchange=fileChosen; el('dlCurrent').onclick=downloadCurrent;
+
+/* ====== Analysis ====== */
+function roiFaceCircle(w,h){ const r=Math.min(w,h)*0.32; return {cx:w/2,cy:h/2,r}; }
+function analyzePercent(img){
+  const c=document.createElement('canvas'); c.width=img.naturalWidth||img.videoWidth; c.height=img.naturalHeight||img.videoHeight; const ctx=c.getContext('2d'); ctx.drawImage(img,0,0);
+  const roi=roiFaceCircle(c.width,c.height);
+  const id=ctx.getImageData(0,0,c.width,c.height); const d=id.data; const W=c.width,H=c.height;
+  const idx=(x,y)=>((y*W+x)<<2); const luma=(x,y)=>{ const i=idx(x,y); return 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; };
+  let sumY=0,tex=0,red=0,pores=0, bright=0, hairDark=0, hairBright=0, scalpRed=0, flakes=0, roiArea=0;
+  const xmin=Math.max(1, Math.round(roi.cx-roi.r)), xmax=Math.min(W-2, Math.round(roi.cx+roi.r));
+  const ymin=Math.max(1, Math.round(roi.cy-roi.r)), ymax=Math.min(H-2, Math.round(roi.cy+roi.r));
+  function inside(x,y){ const dx=x-roi.cx, dy=y-roi.cy; return dx*dx+dy*dy<=roi.r*roi.r; }
+  for(let y=ymin;y<ymax;y++){
+    for(let x=xmin;x<xmax;x++){
+      if(!inside(x,y)) continue; roiArea++;
+      const i=idx(x,y); const R=d[i],G=d[i+1],B=d[i+2];
+      const Y=luma(x,y); sumY+=Y;
+      const gx=(-1*luma(x-1,y-1)+1*luma(x+1,y-1))+(-2*luma(x-1,y)+2*luma(x+1,y))+(-1*luma(x-1,y+1)+1*luma(x+1,y+1));
+      const gy=(1*luma(x-1,y-1)+2*luma(x,y-1)+1*luma(x+1,y-1))-(1*luma(x-1,y+1)+2*luma(x,y+1)+1*luma(x+1,y+1));
+      const sbo=Math.sqrt(gx*gx+gy*gy); tex+=sbo;
+      if(R>G+18 && R>120) red++; if(sbo>36) pores++; if(Y>230) bright++;
+      if(Y<60 && sbo>25) hairDark++; if(Y>205) hairBright++; if(R>G+18) scalpRed++; if(Y>238 && sbo>18) flakes++;
+    }
+  }
+  const brightness=(sumY/Math.max(1,roiArea))/255*100;
+  const hydration=Math.max(20, Math.min(95, 55 + ((brightness-50)*0.20) + (tex/Math.max(1,roiArea))*0.15));
+  const rednessPct=Math.max(0, Math.min(95, (red/Math.max(1,roiArea))*120));
+  const poresPct=Math.max(0, Math.min(95, (pores/Math.max(1,roiArea))*52));
+  const drynessPct=Math.max(0, Math.min(95, 100 - hydration));
+  const hairDensity=Math.max(5, Math.min(95, (hairDark/Math.max(1,roiArea))*210));
+  const hairShine=Math.max(5, Math.min(95, (hairBright/Math.max(1,roiArea))*360));
+  const scalpRedPct=Math.max(5, Math.min(95, (scalpRed/Math.max(1,roiArea))*210));
+  const flakesPct=Math.max(5, Math.min(90, (flakes/Math.max(1,roiArea))*180));
+  return {face:{Wrinkles:Math.min(90,tex/Math.max(1,roiArea)), Redness:rednessPct, Dryness:drynessPct, Hydration:hydration, Pores:poresPct, Brightness:Math.max(20,Math.min(85,brightness))},
+          hair:{Density:hairDensity, Shine:hairShine, "Scalp Redness":scalpRedPct, Flakes:flakesPct}};
+}
+const GOOD_METRICS=new Set(['Hydration','Brightness','Density','Shine']);
+function severityFor(metric, value){ let x = GOOD_METRICS.has(metric) ? (100 - value) : value; if (x < 10) return {score:0,label:'None'}; if (x < 30) return {score:1,label:'Weak'}; if (x < 60) return {score:2,label:'Moderate'}; return {score:3,label:'Severe'}; }
+function tagClass(metric,value){ if (GOOD_METRICS.has(metric)){ if (value >= 75) return 'ok'; if (value >= 50) return 'mid'; if (value >= 25) return 'warn'; return 'bad'; } else { const inv = 100 - value; if (inv >= 75) return 'ok'; if (inv >= 50) return 'mid'; if (inv >= 25) return 'warn'; return 'bad'; } }
+function renderScorecards(container, obj){
+  const root=el(container); root.innerHTML='';
+  Object.entries(obj).forEach(([metric,val])=>{
+    const sev=severityFor(metric, Math.round(val));
+    const row=document.createElement('div'); row.className='score';
+    const right=document.createElement('div'); right.className='right';
+    const tag=document.createElement('span'); tag.className='tag '+tagClass(metric,val); tag.textContent=(Math.round(val))+'%';
+    const sevSpan=document.createElement('span'); sevSpan.className='sev'; sevSpan.textContent = `${sev.score} — ${sev.label}`;
+    row.innerHTML=`<span>${metric}</span>`; right.appendChild(tag); right.appendChild(sevSpan); row.appendChild(right); root.appendChild(row);
+  });
+}
+
+function displayCaptured(src){
+  const wrap=el('previewWrap'); wrap.innerHTML='';
+  const img=new Image(); img.onload=()=>{
+    wrap.appendChild(img);
+    const o=document.createElement('div'); o.className='overlay'; o.innerHTML='<div class="circle"></div><div class="midline-x"></div><div class="midline-y"></div>'; wrap.appendChild(o);
+    const out=analyzePercent(img); renderScorecards('faceScores',out.face); renderScorecards('hairScores',out.hair);
+    lastDataURL=src; lastScores=out; el('savePhoto').style.display='inline-block'; el('qualityTag').textContent='Ready to Save'; capturedFrontal=true; updateAngleStatus();
+  }; img.src=src;
+}
+function updateAngleStatus(){ el('angleStatus').textContent = capturedFrontal ? 'Angle completeness: 100% (Frontal captured)' : 'Angle completeness: 0% — Please capture the Frontal angle.'; }
+el('savePhoto').onclick=async()=>{
+  if(!lastDataURL || !currentTP){ alert('Select a timepoint and capture an image.'); return; }
+  let parts=(await dbGet(S_PART))||[]; let p=parts.find(x=>x.email===EMAIL); if(!p){ alert('Start a session.'); return; }
+  const key=p.code+'_'+currentTP; p.timepoints[key]=p.timepoints[key]||{tp:currentTP, angles:{}, ts:new Date().toISOString()};
+  p.timepoints[key].angles['front']={img:lastDataURL, scores:lastScores}; await dbSet(S_PART, parts);
+  alert('Saved '+currentTP+' • Frontal'); renderParticipantsTable();
+};
+
+/* ====== Points ====== */
+function fireConfetti(){
+  const c=document.createElement('canvas'); c.style.position='fixed'; c.style.inset='0'; c.style.pointerEvents='none'; document.body.appendChild(c);
+  const ctx=c.getContext('2d'); c.width=innerWidth; c.height=innerHeight; const parts=[]; for(let i=0;i<120;i++){ parts.push({x:Math.random()*c.width,y:Math.random()*-c.height,vy:1+Math.random()*3,vx:(Math.random()-0.5)*2,size:3+Math.random()*4}); }
+  let t=0; const anim=()=>{ ctx.clearRect(0,0,c.width,c.height); parts.forEach(p=>{ p.y+=p.vy; p.x+=p.vx; ctx.fillStyle=`hsl(${(p.y/4)%360},90%,60%)`; ctx.fillRect(p.x,p.y,p.size,p.size); }); if(t++<240){ requestAnimationFrame(anim); } else { c.remove(); } }; anim();
+}
+el('completeStudy').onclick=async()=>{
+  if(!capturedFrontal){ if(!confirm('Frontal angle not saved for this TP. Continue anyway?')) return; }
+  let parts=(await dbGet(S_PART))||[]; let p=parts.find(x=>x.email===EMAIL); if(!p){ alert('Start a session.'); return; }
+  p.points=(p.points||0)+100; points=p.points; await dbSet(S_PART, parts); el('pointsBox').textContent='Points: '+points; fireConfetti();
+};
+
+/* ====== Admin participants & exports ====== */
+function pFilterMatch(p, q){ const s=(q||'').toLowerCase().trim(); if(!s) return true; return (p.code||'').toLowerCase().includes(s) || (p.email||'').toLowerCase().includes(s); }
+async function renderParticipantsTable(){
+  const tbody=el('participantsTable')?.querySelector('tbody'); if(!tbody) return; tbody.innerHTML='';
+  const q=el('pSearch')?.value||''; const parts=(await dbGet(S_PART))||[]; const rows=parts.filter(p=>pFilterMatch(p,q));
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="7">No participants yet.</td></tr>'; return; }
+  rows.forEach(p=>{
+    const tps=Object.values(p.timepoints||{});
+    let angleCount=0; tps.forEach(t=> angleCount += Object.keys(t.angles||{}).length);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><input type="checkbox" class="sel" data-id="${p.id}"></td><td>${p.code||''}</td><td>${p.name||''}</td><td>${p.email||''}</td><td>${tps.length}</td><td>${angleCount}</td><td>${p.points||0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+el('pSearchBtn')?.addEventListener('click',renderParticipantsTable); el('pClearBtn')?.addEventListener('click',()=>{ el('pSearch').value=''; renderParticipantsTable(); });
+
+function mean(a){ return a.reduce((s,x)=>s+x,0)/a.length; }
+function std(a,m){ return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)); }
+function ttestPaired(before, after){
+  const n = Math.min(before.length, after.length);
+  if(n<2) return {t:0, df:0, p:1};
+  const d = []; for(let i=0;i<n;i++) d.push(after[i]-before[i]);
+  const md = mean(d); const sd = std(d, md); const t = md/(sd/Math.sqrt(n)); const df=n-1;
+  const p = Math.min(1, 2*(1 - Math.min(0.999, Math.abs(t)/(Math.abs(t)+df**0.5)))); // rough
+  return {t, df, p};
+}
+function narrative(metric, pval){
+  if(pval<0.01) return `${metric}: Statistically significant improvement (p<0.01).`;
+  if(pval<0.05) return `${metric}: Significant improvement (p<0.05).`;
+  if(pval<0.10) return `${metric}: Trend toward improvement (p<0.10).`;
+  return `${metric}: No significant change.`;
+}
+
+async function adminExportExcel(){
+  const ids=[...document.querySelectorAll('.sel:checked')].map(x=>x.dataset.id);
+  const list=(await dbGet(S_PART))||[]; const sel=list.filter(x=>ids.includes(x.id));
+  if(!sel.length){ alert('Select at least one participant.'); return; }
+  const wb=new ExcelJS.Workbook(); const sh=wb.addWorksheet('Data');
+  sh.addRow(['Code','Name','Email','TP','Angle','Metric','Value %','Severity (0-3)','Label']);
+  sel.forEach(p=>{
+    Object.values(p.timepoints||{}).forEach(tp=>{
+      Object.entries(tp.angles||{}).forEach(([ang,aRec])=>{
+        const f=aRec.scores?.face||{}; const h=aRec.scores?.hair||{};
+        Object.entries(f).forEach(([mk,mv])=>{ const sev=severityFor(mk,Math.round(mv)); sh.addRow([p.code,p.name,p.email,tp.tp,ang,'Face '+mk,Math.round(mv),sev.score,sev.label]); });
+        Object.entries(h).forEach(([mk,mv])=>{ const sev=severityFor(mk,Math.round(mv)); sh.addRow([p.code,p.name,p.email,tp.tp,ang,'Hair '+mk,Math.round(mv),sev.score,sev.label]); });
+      });
+    });
+  });
+  const sh2=wb.addWorksheet('Stats');
+  sh2.addRow(['Code','Metric','t','df','p-value','Narrative']);
+  sel.forEach(p=>{
+    const tps=Object.values(p.timepoints||{}).sort((a,b)=> (a.tp||'').localeCompare(b.tp||''));
+    const first=tps[0], last=tps[tps.length-1];
+    if(first&&last){
+      const fA=first.angles?.front?.scores?.face||{}; const lA=last.angles?.front?.scores?.face||{};
+      ['Wrinkles','Redness','Dryness','Hydration','Pores','Brightness'].forEach(m=>{
+        const before=[Number(fA[m]||NaN)].filter(x=>!isNaN(x)); const after=[Number(lA[m]||NaN)].filter(x=>!isNaN(x));
+        if(before.length && after.length){ const stats=ttestPaired(before,after); sh2.addRow([p.code,'Face '+m,stats.t,stats.df,stats.p,narrative('Face '+m,stats.p)]); }
+      });
+      const fH=first.angles?.front?.scores?.hair||{}; const lH=last.angles?.front?.scores?.hair||{};
+      ['Density','Shine','Scalp Redness','Flakes'].forEach(m=>{
+        const before=[Number(fH[m]||NaN)].filter(x=>!isNaN(x)); const after=[Number(lH[m]||NaN)].filter(x=>!isNaN(x));
+        if(before.length && after.length){ const stats=ttestPaired(before,after); sh2.addRow([p.code,'Hair '+m,stats.t,stats.df,stats.p,narrative('Hair '+m,stats.p)]); }
+      });
+    }
+  });
+  const buf=await wb.xlsx.writeBuffer(); const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='HAI_Data_Stats.xlsx'; a.click();
+}
+async function adminExportPDF(){
+  const ids=[...document.querySelectorAll('.sel:checked')].map(x=>x.dataset.id);
+  const list=(await dbGet(S_PART))||[]; const sel=list.filter(x=>ids.includes(x.id));
+  if(!sel.length){ alert('Select at least one participant.'); return; }
+  const { jsPDF } = window.jspdf;
+  sel.forEach(p=>{
+    const doc=new jsPDF({unit:'pt',format:'a4'});
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text(`Participant Report — ${p.code}`,40,40);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    doc.text(`Name: ${p.name} | Email: ${p.email} | Points: ${p.points||0}`,40,58);
+    let y=90;
+    Object.values(p.timepoints||{}).forEach(tp=>{
+      doc.setFont('helvetica','bold'); doc.text(`Timepoint: ${tp.tp}`,40,y); y+=14;
+      Object.entries(tp.angles||{}).forEach(([ang,aRec])=>{
+        doc.setFont('helvetica','bold'); doc.text(`• ${ang}`,40,y); y+=14;
+        const f=aRec.scores?.face||{}; const h=aRec.scores?.hair||{};
+        Object.entries(f).forEach(([mk,mv])=>{ const sev=severityFor(mk,Math.round(mv)); doc.setFont('helvetica','normal'); doc.text(`Face ${mk}: ${Math.round(mv)}% — ${sev.score} ${sev.label}`,60,y); y+=12; });
+        Object.entries(h).forEach(([mk,mv])=>{ const sev=severityFor(mk,Math.round(mv)); doc.text(`Hair ${mk}: ${Math.round(mv)}% — ${sev.score} ${sev.label}`,60,y); y+=12; });
+        if(aRec.img){ try{ doc.addImage(aRec.img,'JPEG',360,y-40,180,110); }catch(e){} }
+        y+=120; if(y>760){ doc.addPage(); y=90; }
+      });
+    });
+    y+=10; doc.setFont('helvetica','bold'); doc.text('Scientific Narrative',40,y); y+=14; doc.setFont('helvetica','normal');
+    doc.text('Metrics are computed in a frontal circular ROI to minimize background bias. Severity labels (0=None, 1=Weak, 2=Moderate, 3=Severe) are shown next to each %.',40,y,{maxWidth:520}); y+=36;
+    doc.save(`Report_${p.code}.pdf`);
+  });
+}
+async function adminExportZIP(){
+  const ids=[...document.querySelectorAll('.sel:checked')].map(x=>x.dataset.id);
+  const list=(await dbGet(S_PART))||[]; const sel=list.filter(x=>ids.includes(x.id));
+  if(!sel.length){ alert('Select at least one participant.'); return; }
+  const zip=new JSZip();
+  sel.forEach(p=>{
+    Object.values(p.timepoints||{}).forEach(tp=>{
+      Object.entries(tp.angles||{}).forEach(([ang,aRec])=>{
+        const b64=(aRec.img||'').split(',')[1]; if(b64) zip.file(`${p.code}/${tp.tp}_${ang}.jpg`, b64, {base64:true});
+      });
+    });
+  });
+  zip.generateAsync({type:'blob'}).then(blob=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='HAI_Images.zip'; a.click(); });
+}
+el('adminExportExcel')?.addEventListener('click',adminExportExcel); el('adminExportPDF')?.addEventListener('click',adminExportPDF); el('adminExportZIP')?.addEventListener('click',adminExportZIP);
+el('leaderboard')?.addEventListener('click', async()=>{
+  const { jsPDF } = window.jspdf; const parts=(await dbGet(S_PART))||[]; const doc=new jsPDF({unit:'pt',format:'a4'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Leaderboard — Points',40,40); doc.setFont('helvetica','normal');
+  let y=70; parts.sort((a,b)=>(b.points||0)-(a.points||0)).forEach((p,i)=>{ doc.text(`${i+1}. ${p.code} — ${p.name} — ${p.points||0} pts`,40,y); y+=16; if(y>780){ doc.addPage(); y=60; } });
+  doc.save('Leaderboard.pdf');
+});
+
+/* ====== Bind buttons present in DOM ====== */
+el('saveStudyBtn')?.addEventListener('click',saveStudy);
+el('newStudyBtn')?.addEventListener('click',newStudy);
+
+/* ====== Init ====== */
+document.addEventListener('DOMContentLoaded',()=>{
+  initStudiesUI();
+  // default to Participant view on load
+  showParticipant();
+});
+</script>
+</body>
+</html>
